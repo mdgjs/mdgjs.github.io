@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>贵金属实时报价</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', '微软雅黑', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            font-weight: 600;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #ffd700, #ffec8b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+        
+        .update-time {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+            font-weight: 400;
+        }
+        
+        /* 选项卡导航 */
+        .tab-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 5px;
+        }
+        .tab-btn {
+            flex: 1;
+            text-align: center;
+            padding: 12px 0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #aaa;
+        }
+        .tab-btn.active {
+            background: #ffd700;
+            color: #1a1a2e;
+            box-shadow: 0 2px 8px rgba(255,215,0,0.3);
+        }
+        
+        /* 内容区域 */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        .section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffd700;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,215,0,0.3);
+        }
+        
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .price-row:last-child {
+            border-bottom: none;
+        }
+        
+        .metal-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* 长方形图标 - 统一金黄色，字体12px */
+        .metal-icon {
+            width: 50px;
+            height: 30px;
+            border-radius: 6px;
+            background: #ffd700;
+            color: #1a1a2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        
+        .metal-name span {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .price-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ff6b6b;
+        }
+        
+        .price-unit {
+            font-size: 12px;
+            color: #888;
+            margin-left: 4px;
+            font-weight: 400;
+        }
+        
+        .brand-section {
+            margin-top: 10px;
+        }
+        
+        .brand-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .brand-name {
+            color: #ccc;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        /* 销售价格不再使用独立的 brand-price，而是复用 price-value 和 price-unit */
+        /* 保留样式类以便统一 */
+        
+        /* 后台管理面板 */
+        .admin-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            z-index: 100;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .admin-toggle svg {
+            width: 24px;
+            height: 24px;
+            fill: #fff;
+        }
+        
+        .admin-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 100%;
+            max-width: 400px;
+            height: 100vh;
+            background: #1a1a2e;
+            box-shadow: -5px 0 30px rgba(0,0,0,0.5);
+            z-index: 1000;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+            border-left: 1px solid rgba(255,215,0,0.2);
+        }
+        
+        .admin-panel.active {
+            right: 0;
+        }
+        
+        .admin-header {
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #ffd70030;
+        }
+        
+        .admin-header h2 {
+            font-size: 18px;
+            color: #ffd700;
+            font-weight: 700;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 28px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        
+        .admin-content {
+            padding: 20px;
+        }
+        
+        .config-group {
+            margin-bottom: 25px;
+        }
+        
+        .config-group h3 {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-left: 3px solid #ffd700;
+            padding-left: 8px;
+            font-weight: 700;
+        }
+        
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .config-item label {
+            font-size: 14px;
+            color: #ccc;
+            font-weight: 600;
+        }
+        
+        .config-item input {
+            width: 90px;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 6px;
+            color: #ffd700;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .config-item input:focus {
+            outline: none;
+            border-color: #ffd700;
+            background: rgba(0,0,0,0.5);
+        }
+        
+        .save-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #ffd700, #ffec8b);
+            border: none;
+            border-radius: 8px;
+            color: #1a1a2e;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.1s;
+        }
+        
+        .save-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .reset-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .note {
+            font-size: 12px;
+            color: #888;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+            border-left: 2px solid #ffd700;
+            font-weight: 400;
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(3px);
+            z-index: 999;
+            display: none;
+        }
+        
+        .overlay.active {
+            display: block;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: #ffd700;
+            padding: 15px 30px;
+            border-radius: 40px;
+            z-index: 2000;
+            display: none;
+            font-weight: 700;
+            box-shadow: 0 0 20px #ffd70040;
+            border: 1px solid #ffd700;
+        }
+        
+        .toast.show {
+            display: block;
+            animation: fadeInOut 2s ease;
+        }
+        
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            20%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .data-source-tip {
+            font-size: 11px;
+            color: #555;
+            text-align: center;
+            margin-top: 10px;
+            font-weight: 400;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>贵金属实时报价</h1>
+            <div class="update-time" id="updateTime">数据加载中...</div>
+        </div>
+        
+        <!-- 选项卡导航 -->
+        <div class="tab-nav">
+            <div class="tab-btn active" data-tab="recycle">回收价格</div>
+            <div class="tab-btn" data-tab="sale">销售价格</div>
+        </div>
+        
+        <!-- 回收价格内容 -->
+        <div id="recycleTab" class="tab-content active">
+            <div class="section">
+                <div class="section-title">回收价格（元/克）</div>
+                <div id="recyclePrices">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 销售价格内容 -->
+        <div id="saleTab" class="tab-content">
+            <div class="section">
+                <div class="section-title">销售价格（元/克）</div>
+                <div id="salePrices">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="data-source-tip">数据源: gold-api.com + exchangerate-api.com</div>
+    </div>
+    
+    <!-- 后台管理按钮 -->
+    <div class="admin-toggle" onclick="openAdminWithAuth()" id="adminToggle">
+        <svg viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+    </div>
+    
+    <!-- 遮罩 -->
+    <div class="overlay" id="overlay" onclick="closeAdminPanel()"></div>
+    
+    <!-- 后台管理面板 -->
+    <div class="admin-panel" id="adminPanel">
+        <div class="admin-header">
+            <h2>⚙️ 价格配置后台 (管理员)</h2>
+            <button class="close-btn" onclick="closeAdminPanel()">×</button>
+        </div>
+        <div class="admin-content">
+            <!-- 回收价格配置 -->
+            <div class="config-group">
+                <h3>📉 回收价格调整（每克减少金额）</h3>
+                <div class="config-item">
+                    <label>黄金999 (Au)</label>
+                    <input type="number" id="recycle_gold" value="30" step="0.1">
+                </div>
+                <div class="config-item">
+                    <label>黄金990 (Au990)</label>
+                    <input type="number" id="recycle_gold990" value="40" step="0.1">
+                </div>
+                <div class="config-item">
+                    <label>银999 (Ag)</label>
+                    <input type="number" id="recycle_silver" value="4" step="0.1">
+                </div>
+                <div class="config-item">
+                    <label>银990 (Ag990)</label>
+                    <input type="number" id="recycle_silver990" value="5" step="0.1">
+                </div>
+                <div class="config-item">
+                    <label>银925 (Ag925)</label>
+                    <input type="number" id="recycle_silver925" value="8" step="0.1">
+                </div>
+                <div class="config-item">
+                    <label>铂金 (Pt)</label>
+                    <input type="number" id="recycle_platinum" value="120" step="0.1">
+                </div>
+                <div class="config-item">
+                    <label>钯金 (Pd)</label>
+                    <input type="number" id="recycle_palladium" value="170" step="0.1">
+                </div>
+            </div>
+            
+            <!-- 销售价格配置 -->
+            <div class="config-group">
+                <h3>📈 销售价格调整（每克增加金额）</h3>
+                <div class="config-item">
+                    <label>宝盛黄金</label>
+                    <input type="number" id="sale_baosheng" value="110" step="1">
+                </div>
+                <div class="config-item">
+                    <label>老凤祥黄金</label>
+                    <input type="number" id="sale_laofengxiang" value="210" step="1">
+                </div>
+                <div class="config-item">
+                    <label>老庙黄金</label>
+                    <input type="number" id="sale_laomiao" value="200" step="1">
+                </div>
+                <div class="config-item">
+                    <label>梦金园黄金</label>
+                    <input type="number" id="sale_mengjinyuan" value="190" step="1">
+                </div>
+                <div class="config-item">
+                    <label>中国黄金</label>
+                    <input type="number" id="sale_zhongguo" value="190" step="1">
+                </div>
+                <div class="config-item">
+                    <label>白银 (Ag)</label>
+                    <input type="number" id="sale_silver" value="12" step="0.1">
+                </div>
+            </div>
+            
+            <button class="save-btn" onclick="saveConfig()">💾 保存差价设置</button>
+            <button class="reset-btn" onclick="resetConfig()">🔄 恢复默认差价</button>
+            
+            <div class="note">
+                📌 管理员密码: admin123 (点击右下角按钮输入)<br>
+                📌 黄金750/916价格基于黄金999回收价自动计算 (系数固定)<br>
+                📌 修改差价后保存立即生效，数据每30秒自动更新<br>
+                📌 所有价格均四舍五入取整
+            </div>
+        </div>
+    </div>
+    
+    <!-- 提示消息 -->
+    <div class="toast" id="toast">保存成功！</div>
+    
+    <script>
+        // ==================== 默认差价配置 ====================
+        const DEFAULT_CONFIG = {
+            recycle: {
+                gold: 30,          // 黄金999
+                gold990: 40,        // 黄金990
+                silver: 4,          // 银999
+                silver990: 5,        // 银990
+                silver925: 8,        // 银925
+                platinum: 120,
+                palladium: 170
+            },
+            sale: {
+                baosheng: 110,
+                laofengxiang: 210,
+                laomiao: 200,
+                mengjinyuan: 190,
+                zhongguo: 190,
+                silver: 12
+            }
+        };
+
+        // 当前差价配置
+        let priceConfig = { ...DEFAULT_CONFIG };
+
+        // 最后一次成功获取的基础价格 (美元/盎司)
+        let basePricesUSD = {
+            gold: 1900.0,
+            silver: 23.0,
+            platinum: 900.0,
+            palladium: 1000.0
+        };
+        // 最新汇率 (USD/CNY)
+        let usdCnyRate = 7.2;
+
+        // 从localStorage读取配置
+        function loadConfig() {
+            const saved = localStorage.getItem('priceConfig');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    priceConfig = {
+                        recycle: { ...DEFAULT_CONFIG.recycle, ...parsed.recycle },
+                        sale: { ...DEFAULT_CONFIG.sale, ...parsed.sale }
+                    };
+                } catch (e) {
+                    priceConfig = { ...DEFAULT_CONFIG };
+                }
+            } else {
+                priceConfig = { ...DEFAULT_CONFIG };
+                localStorage.setItem('priceConfig', JSON.stringify(priceConfig));
+            }
+            // 将配置同步到输入框
+            document.getElementById('recycle_gold').value = priceConfig.recycle.gold;
+            document.getElementById('recycle_gold990').value = priceConfig.recycle.gold990;
+            document.getElementById('recycle_silver').value = priceConfig.recycle.silver;
+            document.getElementById('recycle_silver990').value = priceConfig.recycle.silver990;
+            document.getElementById('recycle_silver925').value = priceConfig.recycle.silver925;
+            document.getElementById('recycle_platinum').value = priceConfig.recycle.platinum;
+            document.getElementById('recycle_palladium').value = priceConfig.recycle.palladium;
+            document.getElementById('sale_baosheng').value = priceConfig.sale.baosheng;
+            document.getElementById('sale_laofengxiang').value = priceConfig.sale.laofengxiang;
+            document.getElementById('sale_laomiao').value = priceConfig.sale.laomiao;
+            document.getElementById('sale_mengjinyuan').value = priceConfig.sale.mengjinyuan;
+            document.getElementById('sale_zhongguo').value = priceConfig.sale.zhongguo;
+            document.getElementById('sale_silver').value = priceConfig.sale.silver;
+        }
+
+        // 保存配置
+        function saveConfig() {
+            priceConfig.recycle.gold = parseFloat(document.getElementById('recycle_gold').value) || 0;
+            priceConfig.recycle.gold990 = parseFloat(document.getElementById('recycle_gold990').value) || 0;
+            priceConfig.recycle.silver = parseFloat(document.getElementById('recycle_silver').value) || 0;
+            priceConfig.recycle.silver990 = parseFloat(document.getElementById('recycle_silver990').value) || 0;
+            priceConfig.recycle.silver925 = parseFloat(document.getElementById('recycle_silver925').value) || 0;
+            priceConfig.recycle.platinum = parseFloat(document.getElementById('recycle_platinum').value) || 0;
+            priceConfig.recycle.palladium = parseFloat(document.getElementById('recycle_palladium').value) || 0;
+            priceConfig.sale.baosheng = parseFloat(document.getElementById('sale_baosheng').value) || 0;
+            priceConfig.sale.laofengxiang = parseFloat(document.getElementById('sale_laofengxiang').value) || 0;
+            priceConfig.sale.laomiao = parseFloat(document.getElementById('sale_laomiao').value) || 0;
+            priceConfig.sale.mengjinyuan = parseFloat(document.getElementById('sale_mengjinyuan').value) || 0;
+            priceConfig.sale.zhongguo = parseFloat(document.getElementById('sale_zhongguo').value) || 0;
+            priceConfig.sale.silver = parseFloat(document.getElementById('sale_silver').value) || 0;
+            
+            localStorage.setItem('priceConfig', JSON.stringify(priceConfig));
+            showToast('差价配置已保存');
+            fetchPrices(); // 立即刷新价格
+        }
+
+        // 恢复默认设置
+        function resetConfig() {
+            priceConfig = { ...DEFAULT_CONFIG };
+            localStorage.setItem('priceConfig', JSON.stringify(priceConfig));
+            loadConfig(); // 更新输入框
+            showToast('已恢复默认差价');
+            fetchPrices();
+        }
+
+        // 显示提示
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        // 管理员验证
+        function openAdminWithAuth() {
+            const panel = document.getElementById('adminPanel');
+            if (panel.classList.contains('active')) {
+                closeAdminPanel();
+                return;
+            }
+            const pwd = prompt('🔒 请输入管理员密码:');
+            if (pwd === 'admin123') {
+                panel.classList.add('active');
+                document.getElementById('overlay').classList.add('active');
+            } else if (pwd !== null) {
+                alert('❌ 密码错误，无权限');
+            }
+        }
+
+        function closeAdminPanel() {
+            document.getElementById('adminPanel').classList.remove('active');
+            document.getElementById('overlay').classList.remove('active');
+        }
+
+        // 选项卡切换
+        function initTabs() {
+            const tabs = document.querySelectorAll('.tab-btn');
+            const contents = {
+                recycle: document.getElementById('recycleTab'),
+                sale: document.getElementById('saleTab')
+            };
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const target = tab.dataset.tab;
+                    // 更新按钮状态
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    // 更新内容显示
+                    Object.keys(contents).forEach(key => {
+                        contents[key].classList.remove('active');
+                    });
+                    contents[target].classList.add('active');
+                });
+            });
+        }
+
+        // ---------- 新API获取数据 ----------
+        async function fetchPrices() {
+            try {
+                // 1. 获取美元兑人民币汇率
+                const rateRes = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                if (!rateRes.ok) throw new Error('汇率API响应失败');
+                const rateData = await rateRes.json();
+                const cnyRate = rateData.rates.CNY;
+                if (!cnyRate) throw new Error('未找到CNY汇率');
+                usdCnyRate = cnyRate;
+
+                // 2. 并发获取四种金属的美元价格 (gold-api.com)
+                const symbols = ['XAU', 'XAG', 'XPT', 'XPD'];
+                const fetchPromises = symbols.map(async (sym) => {
+                    const res = await fetch(`https://api.gold-api.com/price/${sym}`);
+                    if (!res.ok) throw new Error(`${sym}价格获取失败`);
+                    return res.json();
+                });
+                const results = await Promise.all(fetchPromises);
+
+                // 3. 解析价格
+                results.forEach((item, index) => {
+                    const sym = symbols[index];
+                    const priceUSD = item.price;
+                    if (priceUSD === undefined) throw new Error(`${sym}价格字段缺失`);
+                    switch (sym) {
+                        case 'XAU': basePricesUSD.gold = priceUSD; break;
+                        case 'XAG': basePricesUSD.silver = priceUSD; break;
+                        case 'XPT': basePricesUSD.platinum = priceUSD; break;
+                        case 'XPD': basePricesUSD.palladium = priceUSD; break;
+                    }
+                });
+
+                // 更新显示
+                updateDisplay();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                showToast('⚠️ 数据获取失败，使用缓存数据');
+                updateDisplay();
+            }
+        }
+
+        // 将美元/盎司转换为人民币/克
+        function usdPerOunceToCnyPerGram(usdPrice) {
+            return (usdPrice * usdCnyRate) / 31.10348;
+        }
+
+        // 更新页面显示
+        function updateDisplay() {
+            // 计算人民币基础价格 (每克)
+            const basePricesCNY = {
+                gold: usdPerOunceToCnyPerGram(basePricesUSD.gold),
+                silver: usdPerOunceToCnyPerGram(basePricesUSD.silver),
+                platinum: usdPerOunceToCnyPerGram(basePricesUSD.platinum),
+                palladium: usdPerOunceToCnyPerGram(basePricesUSD.palladium)
+            };
+
+            // 回收价格 (基础价 - 回收差价) 并四舍五入取整
+            const recyclePrices = {
+                gold: Math.round(basePricesCNY.gold - priceConfig.recycle.gold),
+                gold990: Math.round(basePricesCNY.gold - priceConfig.recycle.gold990),
+                silver: Math.round(basePricesCNY.silver - priceConfig.recycle.silver),
+                silver990: Math.round(basePricesCNY.silver - priceConfig.recycle.silver990),
+                silver925: Math.round(basePricesCNY.silver - priceConfig.recycle.silver925),
+                platinum: Math.round(basePricesCNY.platinum - priceConfig.recycle.platinum),
+                palladium: Math.round(basePricesCNY.palladium - priceConfig.recycle.palladium)
+            };
+            
+            // 黄金750/916，基于黄金999回收价乘以系数
+            recyclePrices.gold750 = Math.round(recyclePrices.gold * 0.72);
+            recyclePrices.gold916 = Math.round(recyclePrices.gold * 0.9);
+            
+            // 销售价格 (黄金品牌使用黄金基础价 + 销售差价)
+            const salePrices = {
+                baosheng: Math.round(basePricesCNY.gold + priceConfig.sale.baosheng),
+                laofengxiang: Math.round(basePricesCNY.gold + priceConfig.sale.laofengxiang),
+                laomiao: Math.round(basePricesCNY.gold + priceConfig.sale.laomiao),
+                mengjinyuan: Math.round(basePricesCNY.gold + priceConfig.sale.mengjinyuan),
+                zhongguo: Math.round(basePricesCNY.gold + priceConfig.sale.zhongguo),
+                silver: Math.round(basePricesCNY.silver + priceConfig.sale.silver)
+            };
+            
+            // 更新回收价格显示（使用长方形图标）
+            document.getElementById('recyclePrices').innerHTML = `
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Au999</div>
+                        <span>黄金999</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.gold}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Au990</div>
+                        <span>黄金990</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.gold990}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Au750</div>
+                        <span>黄金750</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.gold750}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Au916</div>
+                        <span>黄金916</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.gold916}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Ag999</div>
+                        <span>银999</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.silver}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Ag990</div>
+                        <span>银990</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.silver990}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Ag925</div>
+                        <span>银925</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.silver925}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Pt</div>
+                        <span>铂金</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.platinum}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <div class="metal-name">
+                        <div class="metal-icon">Pd</div>
+                        <span>钯金</span>
+                    </div>
+                    <div>
+                        <span class="price-value">${recyclePrices.palladium}</span>
+                        <span class="price-unit">元/克</span>
+                    </div>
+                </div>
+            `;
+            
+            // 更新销售价格显示（无图标，字体与回收一致，价格红色，单位灰色）
+            document.getElementById('salePrices').innerHTML = `
+                <div class="brand-section">
+                    <div class="brand-item">
+                        <span class="brand-name">宝盛黄金</span>
+                        <div>
+                            <span class="price-value">${salePrices.baosheng}</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                    </div>
+                    <div class="brand-item">
+                        <span class="brand-name">老凤祥黄金</span>
+                        <div>
+                            <span class="price-value">${salePrices.laofengxiang}</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                    </div>
+                    <div class="brand-item">
+                        <span class="brand-name">老庙黄金</span>
+                        <div>
+                            <span class="price-value">${salePrices.laomiao}</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                    </div>
+                    <div class="brand-item">
+                        <span class="brand-name">梦金园黄金</span>
+                        <div>
+                            <span class="price-value">${salePrices.mengjinyuan}</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                    </div>
+                    <div class="brand-item">
+                        <span class="brand-name">中国黄金</span>
+                        <div>
+                            <span class="price-value">${salePrices.zhongguo}</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                    </div>
+                    <div class="brand-item">
+                        <span class="brand-name">足银</span>
+                        <div>
+                            <span class="price-value">${salePrices.silver}</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 更新时间
+            const now = new Date();
+            document.getElementById('updateTime').innerHTML = 
+                `更新时间：${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+        }
+
+        // 初始化
+        loadConfig();
+        fetchPrices();
+        initTabs();
+
+        // 每30秒刷新一次
+        setInterval(fetchPrices, 30000);
+    </script>
+</body>
+</html>

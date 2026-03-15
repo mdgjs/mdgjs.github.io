@@ -167,9 +167,6 @@
             font-weight: 700;
         }
         
-        /* 销售价格不再使用独立的 brand-price，而是复用 price-value 和 price-unit */
-        /* 保留样式类以便统一 */
-        
         /* 后台管理面板 */
         .admin-toggle {
             position: fixed;
@@ -441,23 +438,23 @@
                 <h3>📉 回收价格调整（每克减少金额）</h3>
                 <div class="config-item">
                     <label>黄金999 (Au)</label>
-                    <input type="number" id="recycle_gold" value="30" step="0.1">
+                    <input type="number" id="recycle_gold" value="20" step="0.1">
                 </div>
                 <div class="config-item">
                     <label>黄金990 (Au990)</label>
-                    <input type="number" id="recycle_gold990" value="40" step="0.1">
+                    <input type="number" id="recycle_gold990" value="30" step="0.1">
                 </div>
                 <div class="config-item">
                     <label>银999 (Ag)</label>
-                    <input type="number" id="recycle_silver" value="4" step="0.1">
+                    <input type="number" id="recycle_silver" value="2" step="0.1">
                 </div>
                 <div class="config-item">
                     <label>银990 (Ag990)</label>
-                    <input type="number" id="recycle_silver990" value="5" step="0.1">
+                    <input type="number" id="recycle_silver990" value="3" step="0.1">
                 </div>
                 <div class="config-item">
                     <label>银925 (Ag925)</label>
-                    <input type="number" id="recycle_silver925" value="8" step="0.1">
+                    <input type="number" id="recycle_silver925" value="5" step="0.1">
                 </div>
                 <div class="config-item">
                     <label>铂金 (Pt)</label>
@@ -474,26 +471,26 @@
                 <h3>📈 销售价格调整（每克增加金额）</h3>
                 <div class="config-item">
                     <label>宝盛黄金</label>
-                    <input type="number" id="sale_baosheng" value="110" step="1">
+                    <input type="number" id="sale_baosheng" value="100" step="1">
                 </div>
                 <div class="config-item">
                     <label>老凤祥黄金</label>
-                    <input type="number" id="sale_laofengxiang" value="210" step="1">
+                    <input type="number" id="sale_laofengxiang" value="200" step="1">
                 </div>
                 <div class="config-item">
                     <label>老庙黄金</label>
-                    <input type="number" id="sale_laomiao" value="200" step="1">
+                    <input type="number" id="sale_laomiao" value="190" step="1">
                 </div>
                 <div class="config-item">
                     <label>梦金园黄金</label>
-                    <input type="number" id="sale_mengjinyuan" value="190" step="1">
+                    <input type="number" id="sale_mengjinyuan" value="180" step="1">
                 </div>
                 <div class="config-item">
                     <label>中国黄金</label>
-                    <input type="number" id="sale_zhongguo" value="190" step="1">
+                    <input type="number" id="sale_zhongguo" value="180" step="1">
                 </div>
                 <div class="config-item">
-                    <label>白银 (Ag)</label>
+                    <label>足银</label>
                     <input type="number" id="sale_silver" value="12" step="0.1">
                 </div>
             </div>
@@ -503,9 +500,9 @@
             
             <div class="note">
                 📌 管理员密码: admin123 (点击右下角按钮输入)<br>
-                📌 黄金750/916价格基于黄金999回收价自动计算 (系数固定)<br>
+                📌 黄金回收价向下取整至0/5，黄金销售价向上取整至8<br>
                 📌 修改差价后保存立即生效，数据每30秒自动更新<br>
-                📌 所有价格均四舍五入取整
+                📌 所有价格均四舍五入取整后应用尾数规则
             </div>
         </div>
     </div>
@@ -514,23 +511,23 @@
     <div class="toast" id="toast">保存成功！</div>
     
     <script>
-        // ==================== 默认差价配置 ====================
+        // ==================== 默认差价配置（新数值） ====================
         const DEFAULT_CONFIG = {
             recycle: {
-                gold: 30,          // 黄金999
-                gold990: 40,        // 黄金990
-                silver: 4,          // 银999
-                silver990: 5,        // 银990
-                silver925: 8,        // 银925
+                gold: 20,          // 黄金999
+                gold990: 30,        // 黄金990
+                silver: 2,          // 银999
+                silver990: 3,        // 银990
+                silver925: 5,        // 银925
                 platinum: 120,
                 palladium: 170
             },
             sale: {
-                baosheng: 110,
-                laofengxiang: 210,
-                laomiao: 200,
-                mengjinyuan: 190,
-                zhongguo: 190,
+                baosheng: 100,
+                laofengxiang: 200,
+                laomiao: 190,
+                mengjinyuan: 180,
+                zhongguo: 180,
                 silver: 12
             }
         };
@@ -662,6 +659,28 @@
             });
         }
 
+        // ---------- 尾数处理函数 ----------
+        // 向下取整至最近的0或5结尾
+        function floorTo5or0(num) {
+            const remainder = num % 10;
+            if (remainder < 5) {
+                return num - remainder; // 向下到0
+            } else {
+                return num - remainder + 5; // 向下到5
+            }
+        }
+
+        // 向上取整至最近的8结尾
+        function ceilTo8(num) {
+            const remainder = num % 10;
+            if (remainder <= 8) {
+                return num - remainder + 8;
+            } else {
+                // remainder === 9
+                return num + 10 - remainder + 8; // 等同于 num + 18 - remainder
+            }
+        }
+
         // ---------- 新API获取数据 ----------
         async function fetchPrices() {
             try {
@@ -719,32 +738,58 @@
                 palladium: usdPerOunceToCnyPerGram(basePricesUSD.palladium)
             };
 
-            // 回收价格 (基础价 - 回收差价) 并四舍五入取整
+            // ---------- 回收价格计算（黄金需尾数处理） ----------
+            // 黄金999基础（未尾数）
+            const gold999Base = basePricesCNY.gold - priceConfig.recycle.gold;
+            const gold999Final = floorTo5or0(Math.round(gold999Base)); // 先四舍五入到整数，再尾数处理
+
+            // 黄金990
+            const gold990Base = basePricesCNY.gold - priceConfig.recycle.gold990;
+            const gold990Final = floorTo5or0(Math.round(gold990Base));
+
+            // 黄金750、916基于黄金999最终价计算
+            const gold750Final = floorTo5or0(Math.round(gold999Final * 0.72));
+            const gold916Final = floorTo5or0(Math.round(gold999Final * 0.9));
+
+            // 银及其他金属直接Math.round（不尾数处理）
+            const silverFinal = Math.round(basePricesCNY.silver - priceConfig.recycle.silver);
+            const silver990Final = Math.round(basePricesCNY.silver - priceConfig.recycle.silver990);
+            const silver925Final = Math.round(basePricesCNY.silver - priceConfig.recycle.silver925);
+            const platinumFinal = Math.round(basePricesCNY.platinum - priceConfig.recycle.platinum);
+            const palladiumFinal = Math.round(basePricesCNY.palladium - priceConfig.recycle.palladium);
+
+            // 打包回收价格
             const recyclePrices = {
-                gold: Math.round(basePricesCNY.gold - priceConfig.recycle.gold),
-                gold990: Math.round(basePricesCNY.gold - priceConfig.recycle.gold990),
-                silver: Math.round(basePricesCNY.silver - priceConfig.recycle.silver),
-                silver990: Math.round(basePricesCNY.silver - priceConfig.recycle.silver990),
-                silver925: Math.round(basePricesCNY.silver - priceConfig.recycle.silver925),
-                platinum: Math.round(basePricesCNY.platinum - priceConfig.recycle.platinum),
-                palladium: Math.round(basePricesCNY.palladium - priceConfig.recycle.palladium)
+                gold: gold999Final,
+                gold990: gold990Final,
+                gold750: gold750Final,
+                gold916: gold916Final,
+                silver: silverFinal,
+                silver990: silver990Final,
+                silver925: silver925Final,
+                platinum: platinumFinal,
+                palladium: palladiumFinal
             };
-            
-            // 黄金750/916，基于黄金999回收价乘以系数
-            recyclePrices.gold750 = Math.round(recyclePrices.gold * 0.72);
-            recyclePrices.gold916 = Math.round(recyclePrices.gold * 0.9);
-            
-            // 销售价格 (黄金品牌使用黄金基础价 + 销售差价)
+
+            // ---------- 销售价格计算 ----------
+            // 黄金品牌初步价
+            const baoshengBase = basePricesCNY.gold + priceConfig.sale.baosheng;
+            const laofengxiangBase = basePricesCNY.gold + priceConfig.sale.laofengxiang;
+            const laomiaoBase = basePricesCNY.gold + priceConfig.sale.laomiao;
+            const mengjinyuanBase = basePricesCNY.gold + priceConfig.sale.mengjinyuan;
+            const zhongguoBase = basePricesCNY.gold + priceConfig.sale.zhongguo;
+
+            // 应用向上取整至8
             const salePrices = {
-                baosheng: Math.round(basePricesCNY.gold + priceConfig.sale.baosheng),
-                laofengxiang: Math.round(basePricesCNY.gold + priceConfig.sale.laofengxiang),
-                laomiao: Math.round(basePricesCNY.gold + priceConfig.sale.laomiao),
-                mengjinyuan: Math.round(basePricesCNY.gold + priceConfig.sale.mengjinyuan),
-                zhongguo: Math.round(basePricesCNY.gold + priceConfig.sale.zhongguo),
-                silver: Math.round(basePricesCNY.silver + priceConfig.sale.silver)
+                baosheng: ceilTo8(Math.round(baoshengBase)),
+                laofengxiang: ceilTo8(Math.round(laofengxiangBase)),
+                laomiao: ceilTo8(Math.round(laomiaoBase)),
+                mengjinyuan: ceilTo8(Math.round(mengjinyuanBase)),
+                zhongguo: ceilTo8(Math.round(zhongguoBase)),
+                silver: Math.round(basePricesCNY.silver + priceConfig.sale.silver) // 足银不调整尾数
             };
             
-            // 更新回收价格显示（使用长方形图标）
+            // 更新回收价格显示
             document.getElementById('recyclePrices').innerHTML = `
                 <div class="price-row">
                     <div class="metal-name">
@@ -838,7 +883,7 @@
                 </div>
             `;
             
-            // 更新销售价格显示（无图标，字体与回收一致，价格红色，单位灰色）
+            // 更新销售价格显示
             document.getElementById('salePrices').innerHTML = `
                 <div class="brand-section">
                     <div class="brand-item">

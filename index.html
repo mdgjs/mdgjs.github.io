@@ -155,7 +155,6 @@
         .brand-item {
             display: flex;
             justify-content: space-between;
-            align-items: center;
             padding: 10px 15px;
             background: rgba(255,255,255,0.03);
             border-radius: 8px;
@@ -166,6 +165,14 @@
             color: #ccc;
             font-size: 20px;
             font-weight: 700;
+        }
+
+        .data-source-tip {
+            font-size: 11px;
+            color: #555;
+            text-align: center;
+            margin-top: 10px;
+            font-weight: 400;
         }
         
         .toast {
@@ -193,21 +200,6 @@
             0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
             20%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
         }
-
-        .data-source-tip {
-            font-size: 11px;
-            color: #555;
-            text-align: center;
-            margin-top: 10px;
-            font-weight: 400;
-        }
-
-        .loading-tip {
-            text-align: center;
-            padding: 20px;
-            color: #ffd700;
-            font-size: 14px;
-        }
     </style>
 </head>
 <body>
@@ -228,7 +220,7 @@
             <div class="section">
                 <div class="section-title">回收价格（元/克）</div>
                 <div id="recyclePrices">
-                    <div class="loading-tip">⏳ 加载中...</div>
+                    <!-- 动态生成 -->
                 </div>
             </div>
         </div>
@@ -238,19 +230,19 @@
             <div class="section">
                 <div class="section-title">销售价格（元/克）</div>
                 <div id="salePrices">
-                    <div class="loading-tip">⏳ 加载中...</div>
+                    <!-- 动态生成 -->
                 </div>
             </div>
         </div>
         
-        <div class="data-source-tip">数据源: metals.live + exchangerate-api.com</div>
+        <div class="data-source-tip">数据源: gold-api.com + exchangerate-api.com | 每15秒自动刷新（页面不可见时暂停）</div>
     </div>
     
-    <!-- 提示消息 -->
-    <div class="toast" id="toast">价格已更新</div>
+    <!-- 提示消息（仅用于网络错误提醒） -->
+    <div class="toast" id="toast">⚠️ 数据获取失败，使用上次缓存价格</div>
     
     <script>
-        // ==================== 固定差价配置（不可修改） ====================
+        // ==================== 固定差价配置（无需后台管理） ====================
         const PRICE_CONFIG = {
             recycle: {
                 gold: 40,          // 黄金999
@@ -280,6 +272,11 @@
         };
         // 最新汇率 (USD/CNY)
         let usdCnyRate = 7.2;
+        
+        // 定时器ID
+        let refreshTimer = null;
+        // 刷新间隔（毫秒）15秒
+        const REFRESH_INTERVAL = 15000;
 
         // 显示提示
         function showToast(msg) {
@@ -310,24 +307,23 @@
         }
 
         // ---------- 尾数处理函数 ----------
-        // 向下取整至最近的0或5结尾
+        // 向下取整至最近的0或5结尾（用于回收价）
         function floorTo5or0(num) {
             const remainder = num % 10;
             if (remainder < 5) {
-                return num - remainder; // 向下到0
+                return num - remainder;
             } else {
-                return num - remainder + 5; // 向下到5
+                return num - remainder + 5;
             }
         }
 
-        // 向上取整至最近的8结尾
+        // 向上取整至最近的8结尾（用于品牌销售价）
         function ceilTo8(num) {
             const remainder = num % 10;
             if (remainder <= 8) {
                 return num - remainder + 8;
             } else {
-                // remainder === 9
-                return num + 10 - remainder + 8; // 等同于 num + 18 - remainder
+                return num + 10 - remainder + 8;
             }
         }
 
@@ -336,53 +332,44 @@
             return (usdPrice * usdCnyRate) / 31.10348;
         }
 
-        // 获取实时数据（原子更新，支持CORS）
+        // ---------- API获取数据 ----------
         async function fetchPrices() {
             try {
-                // 同时请求汇率和贵金属现货价格（metals.live 支持 CORS）
-                const [rateResponse, metalsResponse] = await Promise.all([
-                    fetch('https://api.exchangerate-api.com/v4/latest/USD'),
-                    fetch('https://api.metals.live/v1/spot')
-                ]);
+                // 1. 获取美元兑人民币汇率
+                const rateRes = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                if (!rateRes.ok) throw new Error('汇率API响应失败');
+                const rateData = await rateRes.json();
+                const cnyRate = rateData.rates.CNY;
+                if (!cnyRate) throw new Error('未找到CNY汇率');
+                usdCnyRate = cnyRate;
 
-                if (!rateResponse.ok) throw new Error('汇率API响应失败');
-                if (!metalsResponse.ok) throw new Error('金属价格API响应失败');
+                // 2. 并发获取四种金属的美元价格 (gold-api.com)
+                const symbols = ['XAU', 'XAG', 'XPT', 'XPD'];
+                const fetchPromises = symbols.map(async (sym) => {
+                    const res = await fetch(`https://api.gold-api.com/price/${sym}`);
+                    if (!res.ok) throw new Error(`${sym}价格获取失败`);
+                    return res.json();
+                });
+                const results = await Promise.all(fetchPromises);
 
-                const rateData = await rateResponse.json();
-                const metalsData = await metalsResponse.json();
+                // 3. 解析价格
+                results.forEach((item, index) => {
+                    const sym = symbols[index];
+                    const priceUSD = item.price;
+                    if (priceUSD === undefined) throw new Error(`${sym}价格字段缺失`);
+                    switch (sym) {
+                        case 'XAU': basePricesUSD.gold = priceUSD; break;
+                        case 'XAG': basePricesUSD.silver = priceUSD; break;
+                        case 'XPT': basePricesUSD.platinum = priceUSD; break;
+                        case 'XPD': basePricesUSD.palladium = priceUSD; break;
+                    }
+                });
 
-                const newRate = rateData.rates.CNY;
-                if (!newRate) throw new Error('未获取到人民币汇率');
-
-                // 从 metals.live 返回的数组中提取所需金属价格（美元/盎司）
-                const findMetalPrice = (symbol) => {
-                    const item = metalsData.find(m => m.metal === symbol);
-                    if (!item || typeof item.price !== 'number') throw new Error(`未找到${symbol}价格`);
-                    return item.price;
-                };
-
-                const newGold = findMetalPrice('XAU');
-                const newSilver = findMetalPrice('XAG');
-                const newPlatinum = findMetalPrice('XPT');
-                const newPalladium = findMetalPrice('XPD');
-
-                // ✅ 原子更新：所有新数据获取成功后才一次性更新全局状态
-                usdCnyRate = newRate;
-                basePricesUSD = {
-                    gold: newGold,
-                    silver: newSilver,
-                    platinum: newPlatinum,
-                    palladium: newPalladium
-                };
-
-                // 更新界面
                 updateDisplay();
-                showToast('价格已更新');
             } catch (error) {
-                console.error('数据获取失败:', error);
-                showToast('⚠️ 数据获取失败，使用缓存数据');
-                // 仍然使用已有的 basePricesUSD 和 usdCnyRate 刷新显示
-                updateDisplay();
+                console.error('API请求失败:', error);
+                showToast('⚠️ 网络波动，使用上次缓存价格');
+                updateDisplay(); // 使用缓存价格继续显示
             }
         }
 
@@ -396,27 +383,22 @@
                 palladium: usdPerOunceToCnyPerGram(basePricesUSD.palladium)
             };
 
-            // ---------- 回收价格计算（黄金需尾数处理） ----------
-            // 黄金999基础（未尾数）
+            // 回收价格计算
             const gold999Base = basePricesCNY.gold - PRICE_CONFIG.recycle.gold;
             const gold999Final = floorTo5or0(Math.round(gold999Base));
 
-            // 黄金990
             const gold990Base = basePricesCNY.gold - PRICE_CONFIG.recycle.gold990;
             const gold990Final = floorTo5or0(Math.round(gold990Base));
 
-            // 黄金750、916基于黄金999最终价计算（系数 0.72 / 0.9）
             const gold750Final = floorTo5or0(Math.round(gold999Final * 0.72));
             const gold916Final = floorTo5or0(Math.round(gold999Final * 0.9));
 
-            // 银及其他金属直接Math.round
             const silverFinal = Math.round(basePricesCNY.silver - PRICE_CONFIG.recycle.silver);
             const silver990Final = Math.round(basePricesCNY.silver - PRICE_CONFIG.recycle.silver990);
             const silver925Final = Math.round(basePricesCNY.silver - PRICE_CONFIG.recycle.silver925);
             const platinumFinal = Math.round(basePricesCNY.platinum - PRICE_CONFIG.recycle.platinum);
             const palladiumFinal = Math.round(basePricesCNY.palladium - PRICE_CONFIG.recycle.palladium);
 
-            // 打包回收价格
             const recyclePrices = {
                 gold: gold999Final,
                 gold990: gold990Final,
@@ -429,22 +411,20 @@
                 palladium: palladiumFinal
             };
 
-            // ---------- 销售价格计算 ----------
-            // 黄金品牌初步价
+            // 销售价格计算
             const baoshengBase = basePricesCNY.gold + PRICE_CONFIG.sale.baosheng;
             const laofengxiangBase = basePricesCNY.gold + PRICE_CONFIG.sale.laofengxiang;
             const laomiaoBase = basePricesCNY.gold + PRICE_CONFIG.sale.laomiao;
             const mengjinyuanBase = basePricesCNY.gold + PRICE_CONFIG.sale.mengjinyuan;
             const zhongguoBase = basePricesCNY.gold + PRICE_CONFIG.sale.zhongguo;
 
-            // 应用向上取整至8
             const salePrices = {
                 baosheng: ceilTo8(Math.round(baoshengBase)),
                 laofengxiang: ceilTo8(Math.round(laofengxiangBase)),
                 laomiao: ceilTo8(Math.round(laomiaoBase)),
                 mengjinyuan: ceilTo8(Math.round(mengjinyuanBase)),
                 zhongguo: ceilTo8(Math.round(zhongguoBase)),
-                silver: Math.round(basePricesCNY.silver + PRICE_CONFIG.sale.silver) // 足银不调整尾数
+                silver: Math.round(basePricesCNY.silver + PRICE_CONFIG.sale.silver)
             };
             
             // 更新回收价格显示
@@ -595,12 +575,54 @@
                 `更新时间：${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
         }
 
-        // 初始化
-        initTabs();
-        fetchPrices();
+        // ---------- 轮询管理：页面可见时启动定时器，不可见时清除 ----------
+        function startPolling() {
+            if (refreshTimer) return; // 已存在定时器则不再重复创建
+            refreshTimer = setInterval(() => {
+                fetchPrices();
+            }, REFRESH_INTERVAL);
+        }
 
-        // 每30秒刷新一次
-        setInterval(fetchPrices, 30000);
+        function stopPolling() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+        }
+
+        // 页面可见性变化处理
+        function handleVisibilityChange() {
+            if (document.hidden) {
+                // 页面隐藏，停止轮询
+                stopPolling();
+            } else {
+                // 页面重新可见，立即刷新一次数据，然后重新启动轮询
+                fetchPrices();
+                startPolling();
+            }
+        }
+
+        // 初始化可见性监听
+        function initVisibilityPolling() {
+            // 监听页面可见性变化
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            // 初始状态：如果页面可见则启动轮询，否则不启动（但初始加载时总会调用一次fetchPrices，见下方init）
+            if (!document.hidden) {
+                startPolling();
+            }
+        }
+
+        // 整体初始化
+        function init() {
+            initTabs();
+            // 首次获取数据（不依赖定时器）
+            fetchPrices();
+            // 设置可见性轮询管理
+            initVisibilityPolling();
+        }
+
+        // 启动应用
+        init();
     </script>
 </body>
 </html>

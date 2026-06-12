@@ -242,16 +242,16 @@
     <div class="toast" id="toast">⚠️ 数据获取失败，使用上次缓存价格</div>
     
     <script>
-        // ==================== 固定差价配置（无需后台管理） ====================
+        // ==================== 固定差价配置 ====================
         const PRICE_CONFIG = {
             recycle: {
-                gold: 40,          // 黄金999
-                gold990: 50,       // 黄金990
-                silver: 4,         // 银999
-                silver990: 5,      // 银990
-                silver925: 7,      // 银925
-                platinum: 120,
-                palladium: 170
+                gold: 80,          // 黄金999 减80元
+                gold990: 90,       // 黄金990 减90元
+                silver: 5,         // 银999 减5元
+                silver990: 6,      // 银990 减6元
+                silver925: 8,      // 银925 减8元
+                platinum: 150,     // 铂金 减150元
+                palladium: 200     // 钯金 减200元
             },
             sale: {
                 baosheng: 100,
@@ -577,7 +577,7 @@
 
         // ---------- 轮询管理：页面可见时启动定时器，不可见时清除 ----------
         function startPolling() {
-            if (refreshTimer) return; // 已存在定时器则不再重复创建
+            if (refreshTimer) return;
             refreshTimer = setInterval(() => {
                 fetchPrices();
             }, REFRESH_INTERVAL);
@@ -590,38 +590,28 @@
             }
         }
 
-        // 页面可见性变化处理
         function handleVisibilityChange() {
             if (document.hidden) {
-                // 页面隐藏，停止轮询
                 stopPolling();
             } else {
-                // 页面重新可见，立即刷新一次数据，然后重新启动轮询
                 fetchPrices();
                 startPolling();
             }
         }
 
-        // 初始化可见性监听
         function initVisibilityPolling() {
-            // 监听页面可见性变化
             document.addEventListener('visibilitychange', handleVisibilityChange);
-            // 初始状态：如果页面可见则启动轮询，否则不启动（但初始加载时总会调用一次fetchPrices，见下方init）
             if (!document.hidden) {
                 startPolling();
             }
         }
 
-        // 整体初始化
         function init() {
             initTabs();
-            // 首次获取数据（不依赖定时器）
             fetchPrices();
-            // 设置可见性轮询管理
             initVisibilityPolling();
         }
 
-        // 启动应用
         init();
     </script>
 </body>

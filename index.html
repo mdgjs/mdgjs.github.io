@@ -245,21 +245,19 @@
         // ==================== 固定差价配置 ====================
         const PRICE_CONFIG = {
             recycle: {
-                gold: 80,          // 黄金999 减80元
-                gold990: 90,       // 黄金990 减90元
-                silver: 5,         // 银999 减5元
-                silver990: 6,      // 银990 减6元
-                silver925: 8,      // 银925 减8元
-                platinum: 150,     // 铂金 减150元
-                palladium: 200     // 钯金 减200元
+                gold: 20,          // 黄金999 减20元
+                gold990: 30,       // 黄金990 减30元
+                silver: 3,         // 银999 减3元
+                silver990: 4,      // 银990 减4元
+                silver925: 6,      // 银925 减6元
+                platinum: 120      // 铂金 减120元
             },
             sale: {
-                baosheng: 100,
-                laofengxiang: 200,
-                laomiao: 190,
-                mengjinyuan: 180,
-                zhongguo: 170,
-                silver: 11
+                baosheng: 90,
+                laofengxiang: 130,
+                laomiao: 120,
+                mengjinyuan: 110,
+                silver: 6
             }
         };
 
@@ -267,8 +265,7 @@
         let basePricesUSD = {
             gold: 1900.0,
             silver: 23.0,
-            platinum: 900.0,
-            palladium: 1000.0
+            platinum: 900.0
         };
         // 最新汇率 (USD/CNY)
         let usdCnyRate = 7.2;
@@ -332,7 +329,7 @@
             return (usdPrice * usdCnyRate) / 31.10348;
         }
 
-        // ---------- API获取数据 ----------
+        // ---------- API获取数据（gold-api.com） ----------
         async function fetchPrices() {
             try {
                 // 1. 获取美元兑人民币汇率
@@ -343,8 +340,8 @@
                 if (!cnyRate) throw new Error('未找到CNY汇率');
                 usdCnyRate = cnyRate;
 
-                // 2. 并发获取四种金属的美元价格 (gold-api.com)
-                const symbols = ['XAU', 'XAG', 'XPT', 'XPD'];
+                // 2. 并发获取三种金属的美元价格 (gold-api.com)
+                const symbols = ['XAU', 'XAG', 'XPT'];
                 const fetchPromises = symbols.map(async (sym) => {
                     const res = await fetch(`https://api.gold-api.com/price/${sym}`);
                     if (!res.ok) throw new Error(`${sym}价格获取失败`);
@@ -361,7 +358,6 @@
                         case 'XAU': basePricesUSD.gold = priceUSD; break;
                         case 'XAG': basePricesUSD.silver = priceUSD; break;
                         case 'XPT': basePricesUSD.platinum = priceUSD; break;
-                        case 'XPD': basePricesUSD.palladium = priceUSD; break;
                     }
                 });
 
@@ -379,8 +375,7 @@
             const basePricesCNY = {
                 gold: usdPerOunceToCnyPerGram(basePricesUSD.gold),
                 silver: usdPerOunceToCnyPerGram(basePricesUSD.silver),
-                platinum: usdPerOunceToCnyPerGram(basePricesUSD.platinum),
-                palladium: usdPerOunceToCnyPerGram(basePricesUSD.palladium)
+                platinum: usdPerOunceToCnyPerGram(basePricesUSD.platinum)
             };
 
             // 回收价格计算
@@ -397,7 +392,6 @@
             const silver990Final = Math.round(basePricesCNY.silver - PRICE_CONFIG.recycle.silver990);
             const silver925Final = Math.round(basePricesCNY.silver - PRICE_CONFIG.recycle.silver925);
             const platinumFinal = Math.round(basePricesCNY.platinum - PRICE_CONFIG.recycle.platinum);
-            const palladiumFinal = Math.round(basePricesCNY.palladium - PRICE_CONFIG.recycle.palladium);
 
             const recyclePrices = {
                 gold: gold999Final,
@@ -407,8 +401,7 @@
                 silver: silverFinal,
                 silver990: silver990Final,
                 silver925: silver925Final,
-                platinum: platinumFinal,
-                palladium: palladiumFinal
+                platinum: platinumFinal
             };
 
             // 销售价格计算
@@ -416,14 +409,15 @@
             const laofengxiangBase = basePricesCNY.gold + PRICE_CONFIG.sale.laofengxiang;
             const laomiaoBase = basePricesCNY.gold + PRICE_CONFIG.sale.laomiao;
             const mengjinyuanBase = basePricesCNY.gold + PRICE_CONFIG.sale.mengjinyuan;
-            const zhongguoBase = basePricesCNY.gold + PRICE_CONFIG.sale.zhongguo;
+
+            const baoshengPrice = ceilTo8(Math.round(baoshengBase));
 
             const salePrices = {
-                baosheng: ceilTo8(Math.round(baoshengBase)),
+                baosheng: baoshengPrice,
                 laofengxiang: ceilTo8(Math.round(laofengxiangBase)),
                 laomiao: ceilTo8(Math.round(laomiaoBase)),
                 mengjinyuan: ceilTo8(Math.round(mengjinyuanBase)),
-                zhongguo: ceilTo8(Math.round(zhongguoBase)),
+                beijing: baoshengPrice, // 北京黄金与宝盛黄金价格相同
                 silver: Math.round(basePricesCNY.silver + PRICE_CONFIG.sale.silver)
             };
             
@@ -509,16 +503,6 @@
                         <span class="price-unit">元/克</span>
                     </div>
                 </div>
-                <div class="price-row">
-                    <div class="metal-name">
-                        <div class="metal-icon">Pd</div>
-                        <span>钯金</span>
-                    </div>
-                    <div>
-                        <span class="price-value">${recyclePrices.palladium}</span>
-                        <span class="price-unit">元/克</span>
-                    </div>
-                </div>
             `;
             
             // 更新销售价格显示
@@ -553,9 +537,9 @@
                         </div>
                     </div>
                     <div class="brand-item">
-                        <span class="brand-name">中国黄金</span>
+                        <span class="brand-name">北京黄金</span>
                         <div>
-                            <span class="price-value">${salePrices.zhongguo}</span>
+                            <span class="price-value">${salePrices.beijing}</span>
                             <span class="price-unit">元/克</span>
                         </div>
                     </div>
